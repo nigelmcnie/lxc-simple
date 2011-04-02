@@ -107,7 +107,7 @@ given ( $command ) {
         # TODO
     }
     default {
-        croak "No such command";
+        die "No such command.\n\nTry $0 --help\n";
     }
 }
 
