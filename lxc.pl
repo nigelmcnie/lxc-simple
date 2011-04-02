@@ -124,10 +124,10 @@ lxc - Wrapper around lxc utils to make managing containers easier
 
     Commands:
 
-     lxc create [name] --template=[lucid|maverick|etc...]
-     lxc destroy [name]
-     lxc start [name]
-     lxc stop [name]
+     lxc [name] create --template=[lucid|maverick|etc...]
+     lxc [name] destroy
+     lxc [name] start
+     lxc [name] stop
      lxc status
      lxc resync
 
