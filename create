@@ -1,0 +1,65 @@
+#!/bin/sh
+set -e
+
+NAME=$1
+IP=$2
+
+if [ $(id -u) != 0 ]; then
+    echo "This command must be run as root"
+    exit 1
+fi
+
+if [ -z "$NAME" ]; then
+    echo "Usage: create [name] [ip]"
+    exit 1
+fi
+
+if [ -z "$IP" ]; then
+    echo "Usage: create [name] [ip]"
+    exit 1
+fi
+
+var=/var/lib/lxc/$NAME
+
+lxc-create -n $NAME -f /etc/lxc/lxc.conf -t ubuntu
+
+# Bindmount homedir into container
+echo "/home           $var/rootfs/home         reiserfs bind 0 0" >> $var/fstab
+
+# Nice network config
+cat <<EOF > $var/rootfs/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address $IP
+    netmask 255.255.255.0
+    broadcast 192.168.1.255
+    gateway 192.168.1.1
+    dns-nameservers 192.168.1.1
+    dns-search home.mcnie.name
+EOF
+
+# apt setup
+echo 'deb http://bubbles:9999/ubuntu lucid main universe' > $var/rootfs/etc/apt/sources.list
+
+# User setup
+echo 'nigel:x:1000:1000:Nigel McNie,,,:/home/nigel:/bin/bash' >> $var/rootfs/etc/passwd
+echo 'nigel:$6$F2KEytrj$Yw5A5vMV1cTSzLP5VgpuUUisNvRbmxEJh5j7RxXfkWys9pfQBgZ7f5qK9EY0UW2jw2MzEFUr8AyskBUlY1AVj.:15061:0:99999:7:::' >> $var/rootfs/etc/shadow
+echo 'nigel:x:1000:' >> $var/rootfs/etc/group
+
+# Base package installation
+echo -n 'Configuring apt... '
+chroot $var/rootfs/ apt-get update > /dev/null 2>&1
+chroot $var/rootfs/ apt-get install -y --force-yes gpgv > /dev/null 2>&1
+chroot $var/rootfs/ apt-get update > /dev/null 2>&1
+echo 'done'
+
+echo -n 'Installing base packages... '
+chroot $var/rootfs/ apt-get install -y sudo less policycoreutils > /dev/null 2>&1
+echo 'done'
+
+chroot $var/rootfs/ adduser nigel sudo
+
+lxc-start -n $NAME -d
