@@ -54,6 +54,10 @@ If true, bind mounts /home into the container. Also, if this script was invoked
 by C<sudo>, it creates an account and group in the container for that user,
 using the same details as on the host (e.g. same password).
 
+=item mirror
+
+The mirror to use to download packages.
+
 =back
 
 =cut
@@ -106,6 +110,19 @@ sub create {
         else {
             print "Could not establish what user to install, skipping\n";
         }
+    }
+
+    if ( $args{mirror} ) {
+        my $mirror = $args{mirror};
+        my $contents;
+
+        open(FH, '<', $container_root . 'etc/apt/sources.list');
+        read(FH, $contents, 4096);
+        close(FH);
+        $contents =~ s/archive.ubuntu.com/$mirror/g;
+        open(FH, '>', $container_root . 'etc/apt/sources.list');
+        printf FH $contents;
+        close(FH);
     }
 }
 

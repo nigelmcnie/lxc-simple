@@ -41,7 +41,8 @@ if (!GetOptions(\%opt,
     # Other options will go here, as individual commands want them
 
     # Only used by 'create'
-    'u|user-from-host'
+    'm|mirror=s',
+    'u|user-from-host',
 )) {
     pod2usage(-exitval => 1, -verbose => 0);
 }
@@ -76,6 +77,7 @@ given ( $command ) {
         LXC::Commands->create(
             name           => $name,
             install_user   => $opt{u},
+            mirror         => $opt{m},
         );
     }
     when ( 'destroy' ) {
