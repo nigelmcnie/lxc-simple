@@ -102,6 +102,11 @@ given ( $command ) {
             name => $name,
         );
     }
+    when ( 'enter' ) {
+        LXC::Commands->enter(
+            name => $name,
+        );
+    }
     when ( 'console' ) {
         LXC::Commands->console(
             name => $name,

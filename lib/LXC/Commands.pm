@@ -77,6 +77,22 @@ sub create {
     my $container_cfgroot = $lxc_root . $name . '/';
     my $container_root    = $lxc_root . $name . '/rootfs/';
 
+    # Install our own /etc/network/interfaces
+    my $interfaces_content = q(
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+    # NOTE: if you're making your own interface definition, leave this line in
+    # place so that 'lxc [name] enter' will work
+    up ip a s dev eth0 | grep 'inet\W' | awk '{print $2}' | cut -f 1 -d '/' > /lxc-ip
+);
+    open(FH, '>', $container_root . 'etc/network/interfaces') or die $!;
+    print FH $interfaces_content;
+    close(FH);
+
+    # Bindmount homedir and install user account if asked for
     if ( $args{install_user} ) {
         open(FH, '>>', $container_cfgroot . 'fstab') or die $!;
         printf FH "/home           %s         auto bind 0 0\n", $container_root . 'home';
@@ -229,6 +245,49 @@ sub stop {
         '-s', 'STOPPED',
     );
     print "done\n";
+}
+
+
+=head2 enter
+
+Gives you a shell in the container.
+
+Note: until C<lxc-attach> is implemented in the kernel (which it still wasn't
+as of 2.6.38rc1), we hack this functionality by using ssh instead.
+
+For that we need to know the IP of the guest, which it provides by dumping it
+to /lxc-ip (in the container) when the interface is brought up.
+
+If ssh isn't running or the IP isn't written to that file, we can't get a
+shell. It would be much nicer if lxc-attach worked!
+
+Takes a hash with the following keys:
+
+=over 4
+
+=item name
+
+The name of the container to get a shell in.
+
+=back
+
+=cut
+
+sub enter {
+    my ($class, %args) = @_;
+    my $name = $args{name} || die "Must specify what container to get a shell in\n";
+    $class->check_valid_container($name);
+
+    die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
+
+    my $ip = `cat /var/lib/lxc/$name/rootfs/lxc-ip`;
+    chomp $ip;
+    die "No IP available for container '$name'" unless $ip;
+
+    system('ssh',
+        '-o', 'StrictHostKeyChecking=no',
+        'root@' . $ip
+    );
 }
 
 
