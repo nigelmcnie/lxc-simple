@@ -6,7 +6,7 @@ Getting started with lxc
 
 ::
 
-    apt-get install lxc debootstrap
+    apt-get install lxc debootstrap libpasswd-unix-perl
 
 2. Set up networking
 --------------------

@@ -39,6 +39,9 @@ if (!GetOptions(\%opt,
     'version',
 
     # Other options will go here, as individual commands want them
+
+    # Only used by 'create'
+    'u|user-from-host'
 )) {
     pod2usage(-exitval => 1, -verbose => 0);
 }
@@ -72,8 +75,7 @@ given ( $command ) {
     when ( 'create' ) {
         LXC::Commands->create(
             name           => $name,
-            bindmount_home => 1,
-            install_user   => 1,
+            install_user   => $opt{u},
         );
     }
     when ( 'destroy' ) {

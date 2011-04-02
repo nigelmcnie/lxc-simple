@@ -19,6 +19,8 @@ package LXC::Commands;
 use warnings;
 use strict;
 
+use Passwd::Unix;
+
 =head1 NAME
 
 LXC::Commands - commands for LXC
@@ -46,6 +48,12 @@ Takes a hash with the following keys:
 
 The name of the container to create.
 
+=item install_user
+
+If true, bind mounts /home into the container. Also, if this script was invoked
+by C<sudo>, it creates an account and group in the container for that user,
+using the same details as on the host (e.g. same password).
+
 =back
 
 =cut
@@ -61,22 +69,39 @@ sub create {
     );
 
     # TODO /var/lib/lxc should be configurable
-    if ( $args{bindmount_home} ) {
-        my $lxc_root          = '/var/lib/lxc/';
-        my $container_cfgroot = $lxc_root . $name . '/';
-        my $container_root    = $lxc_root . $name . '/rootfs/';
+    my $lxc_root          = '/var/lib/lxc/';
+    my $container_cfgroot = $lxc_root . $name . '/';
+    my $container_root    = $lxc_root . $name . '/rootfs/';
+
+    if ( $args{install_user} ) {
         open(FH, '>>', $container_cfgroot . 'fstab') or die $!;
         printf FH "/home           %s         auto bind 0 0\n", $container_root . 'home';
         close(FH);
-    }
 
-    if ( $args{install_user} ) {
         # TODO naturally, we could grab this information from a config file
         if ( exists $ENV{SUDO_USER} ) {
-            my $user = $ENV{SUDO_USER};
-            # TODO find user line in /etc/passwd, append to container's /etc/passwd
-            # TODO find user line in /etc/shadow, append to container's /etc/shadow
-            # TODO find group line in /etc/group, append to container's /etc/group
+            my $user  = $ENV{SUDO_USER};
+            my $group = $ENV{SUDO_USER};
+
+            my $hostpw = Passwd::Unix->new(
+                passwd => '/etc/passwd',
+                shadow => '/etc/shadow',
+                group  => '/etc/group',
+                backup => 0,
+            );
+            my @userinfo  = $hostpw->user($user);
+            my @groupinfo = $hostpw->group($group);
+            use Data::Dumper;
+            warn Dumper(@groupinfo);
+
+            my $containerpw = Passwd::Unix->new(
+                passwd => $container_root . 'etc/passwd',
+                shadow => $container_root . 'etc/shadow',
+                group  => $container_root . 'etc/group',
+                backup => 0,
+            );
+            $containerpw->user($user, @userinfo);
+            $containerpw->group($group, @groupinfo);
         }
         else {
             print "Could not establish what user to install, skipping\n";
