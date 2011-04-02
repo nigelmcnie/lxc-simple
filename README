@@ -6,7 +6,7 @@ Getting started with lxc
 
 ::
 
-    apt-get install lxc
+    apt-get install lxc debootstrap
 
 2. Set up networking
 --------------------
