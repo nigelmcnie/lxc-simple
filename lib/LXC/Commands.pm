@@ -124,6 +124,9 @@ sub create {
         printf FH $contents;
         close(FH);
     }
+
+    system('chroot', $container_root, 'apt-get', 'install', '-y', '--force-yes', 'gpgv');
+    system('chroot', $container_root, 'apt-get', 'update');
 }
 
 
