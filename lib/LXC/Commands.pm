@@ -95,8 +95,6 @@ sub create {
             );
             my @userinfo  = $hostpw->user($user);
             my @groupinfo = $hostpw->group($group);
-            use Data::Dumper;
-            warn Dumper(@groupinfo);
 
             my $containerpw = Passwd::Unix->new(
                 passwd => $container_root . 'etc/passwd',
