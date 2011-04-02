@@ -137,6 +137,8 @@ iface eth0 inet dhcp
         open(FH, '>', $container_root . 'etc/apt/sources.list');
         printf FH $contents;
         close(FH);
+
+        system('chroot', $container_root, 'apt-get', 'update');
     }
 
     system('chroot', $container_root, 'apt-get', 'install', '-y', '--force-yes', 'gpgv');
