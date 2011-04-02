@@ -100,6 +100,11 @@ given ( $command ) {
             name => $name,
         );
     }
+    when ( 'console' ) {
+        LXC::Commands->console(
+            name => $name,
+        );
+    }
     when ( 'status' ) {
         LXC::Commands->status(
             name => $name,
@@ -130,6 +135,7 @@ lxc - Wrapper around lxc utils to make managing containers easier
      lxc [name] destroy
      lxc [name] start
      lxc [name] stop
+     lxc [name] console
      lxc status
      lxc resync
 

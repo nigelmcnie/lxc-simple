@@ -214,6 +214,46 @@ sub stop {
 }
 
 
+=head2 console
+
+Gives you a console in the container.
+
+Note you can only grab ONE console. Really, 'enter' is the better command to be
+using (although it doesn't work in maverick or earlier).
+
+Takes a hash with the following keys:
+
+=over 4
+
+=item name
+
+The name of the container to get a console in.
+
+=back
+
+=cut
+
+sub console {
+    my ($class, %args) = @_;
+    my $name = $args{name} || die "Must specify what container to get a console in\n";
+    $class->check_valid_container($name);
+
+    die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
+
+    my $lockfile = '/var/lib/lxc/' . $name . '/console-lock';
+
+    die "You already have the console for this container open elsewhere\n" if -f $lockfile;
+    open(FH, '>', $lockfile);
+    close(FH);
+
+    system('lxc-console',
+        '-n', $name,
+    );
+
+    unlink $lockfile;
+}
+
+
 =head2 status
 
 Gives status information about one or all containers.
