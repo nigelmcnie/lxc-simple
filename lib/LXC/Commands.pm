@@ -291,6 +291,7 @@ sub enter {
     die "No IP available for container '$name'" unless $ip;
     die "Could not determine container IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
 
+    print "Default password is 'root'\n";
     system('ssh',
         '-o', 'StrictHostKeyChecking=no',
         'root@' . $ip
