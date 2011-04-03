@@ -70,7 +70,8 @@ sub create {
         '-n', $name,                    # TODO: check for invalid name first?
         '-f', '/etc/lxc/lxc.conf',      # TODO: this is for networking stuff
         '-t', $args{template} // 'ubuntu',
-    );
+    ) == 0
+        or die "lxc-create failed with exit code $?\n";
 
     # TODO /var/lib/lxc should be configurable
     my $lxc_root          = '/var/lib/lxc/';
