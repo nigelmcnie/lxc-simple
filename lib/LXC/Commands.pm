@@ -283,7 +283,7 @@ sub enter {
     die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
 
     my $ip_file = "/var/lib/lxc/$name/rootfs/lxc-ip";
-    die "Could not determine container IP to ssh to" unless -f $ip_file;
+    die "Could not determine container IP to ssh to (maybe ssh hasn't finished starting in the container?)\n" unless -f $ip_file;
     my $ip = read_file($ip_file);
     chomp $ip;
     die "No IP available for container '$name'" unless $ip;
