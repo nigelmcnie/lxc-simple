@@ -22,6 +22,7 @@ use strict;
 use File::Slurp;
 use Passwd::Unix;
 use Sysadm::Install qw(tap);
+use Time::HiRes qw(usleep);
 
 =head1 NAME
 
@@ -95,6 +96,7 @@ iface eth0 inet dhcp
     # NOTE: if you're making your own interface definition, leave this line in
     # place so that 'lxc [name] enter' will work
     up ip a s dev eth0 | grep 'inet\W' | awk '{print $2}' | cut -f 1 -d '/' > /lxc-ip
+    down rm /lxc-ip
 );
     write_file($container_root . 'etc/network/interfaces', $interfaces_content);
 
@@ -212,6 +214,15 @@ sub start {
         '-n', $name,
         '-s', 'RUNNING',
     );
+
+    # NOTE: this will go away once Martyn works out a smarter way of handling
+    # container networking
+    for (1..100) {
+        last if -f "/var/lib/lxc/$name/rootfs/lxc-ip";
+        die "Could not start container!" if $_ == 100;
+        usleep 100_000;
+    }
+
     print "done\n";
 }
 
@@ -240,6 +251,7 @@ sub stop {
     die "Container '$name' IS stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
 
     print "Stopping $name... ";
+    unlink "/var/lib/lxc/$name/rootfs/lxc-ip";
     system('lxc-stop',
         '-n', $name,
     );
