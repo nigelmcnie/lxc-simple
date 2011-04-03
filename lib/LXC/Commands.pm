@@ -59,6 +59,11 @@ using the same details as on the host (e.g. same password).
 
 The mirror to use to download packages.
 
+=item template
+
+The template to use to create the container (see C<lxc-create>'s C<--template>
+option).
+
 =back
 
 =cut
