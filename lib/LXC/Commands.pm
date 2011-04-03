@@ -290,10 +290,30 @@ sub enter {
     die "No IP available for container '$name'" unless $ip;
     die "Could not determine container IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
 
-    print "Default password is 'root'\n";
+    my $host_key = read_file("/var/lib/lxc/$name/rootfs/etc/ssh/ssh_host_rsa_key.pub");
+    $host_key = (split /\s+/, $host_key)[1];
+
+    # Generate an ssh keypair unless one already exists
+    unless ( -f "/var/lib/lxc/$name/ssh.key" ) {
+        system(
+            'ssh-keygen',
+            '-f' => "/var/lib/lxc/$name/ssh.key",
+            '-P' => '',
+        );
+    }
+
+    # Write out a known hosts file based on the ssh host key of the guest
+    write_file("/var/lib/lxc/$name/ssh.known_hosts", "$ip ssh-rsa $host_key\n");
+
+    # Ensure root has the appropriate authorized_keys file in place
+    system('mkdir', '-p', "/var/lib/lxc/$name/rootfs/root/.ssh");
+    system('cp', "/var/lib/lxc/$name/ssh.key.pub", "/var/lib/lxc/$name/rootfs/root/.ssh/authorized_keys");
+
     system('ssh',
-        '-o', 'StrictHostKeyChecking=no',
-        'root@' . $ip
+        '-l' => 'root',
+        '-i' => "/var/lib/lxc/$name/ssh.key",
+        '-o' => "UserKnownHostsFile=/var/lib/lxc/$name/ssh.known_hosts",
+        $ip,
     );
 }
 
