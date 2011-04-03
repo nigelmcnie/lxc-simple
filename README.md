@@ -4,8 +4,6 @@ Getting started with lxc
 1. Install dependencies
 -----------------------
 
-::
-
     apt-get install lxc debootstrap libpasswd-unix-perl
 
 2. Set up networking
@@ -17,7 +15,7 @@ A bridge is basically like a switch. You can plug your ``eth0`` into it, and
 also each container. Then they can all talk to each other and the outside
 world.
 
-Put something like this in ``/etc/network/interfaces``::
+Put something like this in ``/etc/network/interfaces``:
 
     auto lo
     iface lo inet loopback
@@ -46,7 +44,7 @@ dhcp line::
 ----------------------------------------------------------
 
 When containers are created, we need to tell them how to access the network.
-Put this in ``/etc/lxc/lxc.conf``::
+Put this in ``/etc/lxc/lxc.conf``:
 
     lxc.network.type=veth
     lxc.network.link=br0
@@ -54,8 +52,6 @@ Put this in ``/etc/lxc/lxc.conf``::
 
 4. You're ready!
 ----------------
-
-::
 
     # Summary of commands
     lxc --help
@@ -67,7 +63,7 @@ Put this in ``/etc/lxc/lxc.conf``::
     lxc test start
 
     # Enter it
-    lxc test enter    # sshes to it
+    lxc test enter    # sshes to it; password is 'root'
 
     # Stop the container
     lxc test stop
