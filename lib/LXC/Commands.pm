@@ -295,11 +295,13 @@ sub enter {
 
     # Generate an ssh keypair unless one already exists
     unless ( -f "/var/lib/lxc/$name/ssh.key" ) {
-        system(
+        my ($stdout, $stderr, $return_code) = tap(
             'ssh-keygen',
             '-f' => "/var/lib/lxc/$name/ssh.key",
             '-P' => '',
         );
+        print STDERR $stderr;
+        exit $return_code if $return_code;
     }
 
     # Write out a known hosts file based on the ssh host key of the guest
