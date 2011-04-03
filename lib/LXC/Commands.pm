@@ -337,11 +337,11 @@ sub enter {
     die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
 
     my $ip_file = "/var/lib/lxc/$name/rootfs/lxc-ip";
-    die "Could not determine container IP to ssh to (maybe networking isn't up in the container yet)\n" unless -f $ip_file;
+    die "Could not determine IP to ssh to (maybe networking isn't up in '$name' yet)\n" unless -f $ip_file;
     my $ip = read_file($ip_file);
     chomp $ip;
     die "No IP available for container '$name'" unless $ip;
-    die "Could not determine container IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
+    die "Could not determine IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
 
     my $host_key = read_file("/var/lib/lxc/$name/rootfs/etc/ssh/ssh_host_rsa_key.pub");
     $host_key = (split /\s+/, $host_key)[1];
