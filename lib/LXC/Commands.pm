@@ -307,6 +307,11 @@ Takes a hash with the following keys:
 
 The name of the container to get a shell in.
 
+=item command
+
+An arrayref containing a command and arguments to run in the container
+(optional).
+
 =back
 
 =cut
@@ -315,6 +320,7 @@ sub enter {
     my ($class, %args) = @_;
     my $name = $args{name} || die "Must specify what container to get a shell in\n";
     $class->check_valid_container($name);
+    $args{command} //= [];
 
     die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
 
@@ -351,6 +357,7 @@ sub enter {
         '-i' => "/var/lib/lxc/$name/ssh.key",
         '-o' => "UserKnownHostsFile=/var/lib/lxc/$name/ssh.known_hosts",
         $ip,
+        @{$args{command}}
     );
 }
 

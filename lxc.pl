@@ -35,6 +35,13 @@ our $VERSION = '0.1.0';
 
 my (%opt);
 
+# If running the 'exec' command, we insert a -- into the arg list after the
+# command, so the user never has to
+my @exec_args;
+if ( scalar @ARGV > 2 && $ARGV[1] eq 'exec' ) {
+    @exec_args = splice(@ARGV, 2);
+}
+
 if (!GetOptions(\%opt,
     'help|?',
     'version',
@@ -48,6 +55,8 @@ if (!GetOptions(\%opt,
 )) {
     pod2usage(-exitval => 1, -verbose => 0);
 }
+
+push @ARGV, @exec_args;
 
 
 # Actions that don't involve a command
@@ -118,6 +127,12 @@ given ( $command ) {
             name => $name,
         );
     }
+    when ( 'exec' ) {
+        LXC::Commands->enter(
+            name    => $name,
+            command => \@ARGV,
+        );
+    }
     when ( 'status' ) {
         LXC::Commands->status(
             name => $name,
@@ -149,6 +164,7 @@ lxc - Wrapper around lxc utils to make managing containers easier
      lxc [name] destroy
      lxc [name] start|stop|restart
      lxc [name] enter
+     lxc [name] exec command [args]
      lxc [name] console
      lxc status
      lxc resync
