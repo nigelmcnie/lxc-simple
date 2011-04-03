@@ -140,14 +140,15 @@ lxc - Wrapper around lxc utils to make managing containers easier
 
 =head1 SYNOPSIS
 
-    lxc [options] [command]
+    lxc [name] [command]     # When operating on a container
+    lxc [command]            # For some commands
 
     Commands:
 
-     lxc [name] create --template=[lucid|maverick|etc...]
+     lxc [name] create [-u] --template=[lucid|maverick|etc...]
      lxc [name] destroy
-     lxc [name] start
-     lxc [name] stop
+     lxc [name] start|stop|restart
+     lxc [name] enter
      lxc [name] console
      lxc status
      lxc resync
@@ -176,6 +177,29 @@ Display this documentation.
 
 Display the version of this script, and the version of C<lxc> installed on your
 system.
+
+=back
+
+=head1 OPTIONS FOR C<create>
+
+=over 4
+
+=item B<-t|--template>
+
+Specify an LXC template to use to create the container with. This is passed
+through to C<lxc-create>.
+
+=item B<-m|--mirror>
+
+Specify an apt mirror to use inside the container (regretfully, not used for
+downloading the container yet - upstream needs to offer this feature).
+
+=item B<-u|--user-from-host>
+
+If you invoke C<create> via sudo and use this option, it will bind mount /home
+into the container and create a user account for you.
+
+The user account will have the same password as your account on the host.
 
 =back
 
