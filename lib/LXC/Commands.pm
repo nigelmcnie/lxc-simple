@@ -95,15 +95,12 @@ iface eth0 inet dhcp
     # place so that 'lxc [name] enter' will work
     up ip a s dev eth0 | grep 'inet\W' | awk '{print $2}' | cut -f 1 -d '/' > /lxc-ip
 );
-    open(FH, '>', $container_root . 'etc/network/interfaces') or die $!;
-    print FH $interfaces_content;
-    close(FH);
+    write_file($container_root . 'etc/network/interfaces', $interfaces_content);
 
     # Bindmount homedir and install user account if asked for
     if ( $args{install_user} ) {
-        open(FH, '>>', $container_cfgroot . 'fstab') or die $!;
-        printf FH "/home           %s         auto bind 0 0\n", $container_root . 'home';
-        close(FH);
+        append_file($container_cfgroot . 'fstab',
+            sprintf("/home           %s         auto bind 0 0\n", $container_root . 'home'));
 
         # TODO naturally, we could grab this information from a config file
         if ( exists $ENV{SUDO_USER} ) {
@@ -135,15 +132,11 @@ iface eth0 inet dhcp
 
     if ( $args{mirror} ) {
         my $mirror = $args{mirror};
-        my $contents;
+        my $apt_sources_file = $container_root . 'etc/apt/sources.list';
 
-        open(FH, '<', $container_root . 'etc/apt/sources.list');
-        read(FH, $contents, 4096);
-        close(FH);
+        my $contents = read_file($apt_sources_file);
         $contents =~ s/archive.ubuntu.com/$mirror/g;
-        open(FH, '>', $container_root . 'etc/apt/sources.list');
-        printf FH $contents;
-        close(FH);
+        write_file($apt_sources_file, $contents);
 
         system('chroot', $container_root, 'apt-get', 'update');
     }
@@ -333,8 +326,7 @@ sub console {
     my $lockfile = '/var/lib/lxc/' . $name . '/console-lock';
 
     die "You already have the console for this container open elsewhere\n" if -f $lockfile;
-    open(FH, '>', $lockfile);
-    close(FH);
+    write_file($lockfile, "locked by pid $$\n");
 
     system('lxc-console',
         '-n', $name,
