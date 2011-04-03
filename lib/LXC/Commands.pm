@@ -21,6 +21,7 @@ use strict;
 
 use File::Slurp;
 use Passwd::Unix;
+use Sysadm::Install qw(tap);
 
 =head1 NAME
 
@@ -364,7 +365,7 @@ sub status {
         $class->check_valid_container($name);
 
         if ( $args{brief} ) {
-            my $status = `lxc-info -n $name`; # TODO bad evil, use tap instead
+            my ($status, $stderr, $return_code) = tap('lxc-info', '-n', $name);
             if ( $status =~ m{^'\Q$name\E' is ([A-Z]+)$} ) {
                 return lc $1;
             }

@@ -27,6 +27,7 @@ use lib "$FindBin::Bin/lib";
 use Getopt::Long qw(GetOptions);
 use LXC::Commands;
 use Pod::Usage;
+use Sysadm::Install qw(ask);
 
 our $VERSION = '0.1.0';
 
@@ -85,9 +86,7 @@ given ( $command ) {
     when ( 'destroy' ) {
         LXC::Commands->check_valid_container($name);
 
-        # TODO use ask
-        print "Are you sure you want to destroy '$name'? [y/N] ";
-        my $input = <>;
+        my $input = ask("Are you sure you want to destroy '$name'?", 'n');
         die "Aborted\n" unless $input =~ m{^y}i;
 
         LXC::Commands->destroy(
