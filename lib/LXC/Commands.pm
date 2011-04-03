@@ -19,6 +19,7 @@ package LXC::Commands;
 use warnings;
 use strict;
 
+use File::Slurp;
 use Passwd::Unix;
 
 =head1 NAME
@@ -283,9 +284,12 @@ sub enter {
 
     die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
 
-    my $ip = `cat /var/lib/lxc/$name/rootfs/lxc-ip`;
+    my $ip_file = "/var/lib/lxc/$name/rootfs/lxc-ip";
+    die "Could not determine container IP to ssh to" unless -f $ip_file;
+    my $ip = read_file($ip_file);
     chomp $ip;
     die "No IP available for container '$name'" unless $ip;
+    die "Could not determine container IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
 
     system('ssh',
         '-o', 'StrictHostKeyChecking=no',
