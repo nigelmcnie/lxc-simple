@@ -251,6 +251,41 @@ sub stop {
 }
 
 
+=head2 restart
+
+Restarts a container.
+
+Note that this is a brutal stop/start. Stop is nasty by default, it doesn't
+even attempt to do a graceful halt (a problem to fix in future).
+
+Takes a hash with the following keys:
+
+=over 4
+
+=item name
+
+The name of the container to restart.
+
+=back
+
+=cut
+
+sub restart {
+    my ($class, %args) = @_;
+    my $name = $args{name} || die "Must specify what container to restart\n";
+    $class->check_valid_container($name);
+
+    if ( $class->status(name => $name, brief => 1) eq 'stopped' ) {
+        print "Container '$name' already stopped\n";
+    }
+    else {
+        $class->stop(name => $name);
+    }
+
+    $class->start(name => $name);
+}
+
+
 =head2 enter
 
 Gives you a shell in the container.

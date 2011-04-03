@@ -103,6 +103,11 @@ given ( $command ) {
             name => $name,
         );
     }
+    when ( 'restart' ) {
+        LXC::Commands->restart(
+            name => $name,
+        );
+    }
     when ( 'enter' ) {
         LXC::Commands->enter(
             name => $name,
