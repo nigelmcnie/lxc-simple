@@ -2,3 +2,4 @@ Graceful cleanup if program is ctrl-C'd while in lxc-create
 lxc [name] enter using lxc-attach (relies on lxc-attach being implemented upstream)
 Change file reads/writes to use File::Slurp
 Use Sysadm::Install for executing commands and reading input
+Make sure /var/lib/lxc isn't hard coded
