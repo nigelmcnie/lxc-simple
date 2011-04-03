@@ -42,6 +42,7 @@ if (!GetOptions(\%opt,
 
     # Only used by 'create'
     'm|mirror=s',
+    't|template=s',
     'u|user-from-host',
 )) {
     pod2usage(-exitval => 1, -verbose => 0);
@@ -78,6 +79,7 @@ given ( $command ) {
             name           => $name,
             install_user   => $opt{u},
             mirror         => $opt{m},
+            template       => $opt{t},
         );
     }
     when ( 'destroy' ) {

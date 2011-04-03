@@ -69,7 +69,7 @@ sub create {
     system('lxc-create',
         '-n', $name,                    # TODO: check for invalid name first?
         '-f', '/etc/lxc/lxc.conf',      # TODO: this is for networking stuff
-        '-t', 'ubuntu',                 # TODO: naturally, should be configurable
+        '-t', $args{template} // 'ubuntu',
     );
 
     # TODO /var/lib/lxc should be configurable
