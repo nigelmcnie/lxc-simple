@@ -63,7 +63,7 @@ Put this in ``/etc/lxc/lxc.conf``:
     lxc test start
 
     # Enter it
-    lxc test enter    # sshes to it; password is 'root'
+    lxc test enter    # might have to wait a few seconds for networking
 
     # Stop the container
     lxc test stop
