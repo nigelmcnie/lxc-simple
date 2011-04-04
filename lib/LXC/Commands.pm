@@ -242,7 +242,11 @@ sub start {
 
 =head2 stop
 
-Stops a container.
+Gracefully stops a container.
+
+This runs 'halt' in the container and then waits until all processes have
+exited, or some time has passed. If processes are still around after that time,
+it murders them.
 
 Takes a hash with the following keys:
 
@@ -264,10 +268,41 @@ sub stop {
     die "Container '$name' IS stopped\n" if $self->status(name => $name, brief => 1) eq 'stopped';
 
     print "Stopping $name... ";
-    unlink $self->lxc_dir->file("$name/rootfs/lxc-ip");
-    system('lxc-stop',
-        '-n', $name,
+
+    $self->enter(
+        name    => $name,
+        command => [ qw(halt) ],
     );
+    unlink $self->lxc_dir->file("$name/rootfs/lxc-ip");
+
+    # Now we wait until all the processes go away
+    my $timeout = 20;
+    my $unresponsive = 1;
+    for (1..$timeout*10) {
+        my ($stdout, $stderr, $return_code) = tap(
+            'lxc-ps',
+            '--lxc',
+            'ax',
+        );
+        print STDERR $stderr;
+        exit $return_code if $return_code;
+
+        my $count = grep { $_ =~ /^\Q$name\E/ } split "\n", $stdout;
+        unless ( $count ) {
+            $unresponsive = 0;
+            last;
+        }
+
+        usleep 100_000;
+    }
+
+    if ( $self->status(name => $name, brief => 1) eq 'running' ) {
+        print "WARNING: Container '$name' still wasn't shut down after $timeout seconds, forcing it... " if $unresponsive;
+        system('lxc-stop',
+            '-n', $name,
+        );
+    }
+
     system('lxc-wait',
         '-n', $name,
         '-s', 'STOPPED',
@@ -280,8 +315,8 @@ sub stop {
 
 Restarts a container.
 
-Note that this is a brutal stop/start. Stop is nasty by default, it doesn't
-even attempt to do a graceful halt (a problem to fix in future).
+This issues a stop, if the container is running, and then a start. After this,
+the container will be running even if it wasn't before.
 
 Takes a hash with the following keys:
 
