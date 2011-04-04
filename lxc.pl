@@ -37,8 +37,7 @@ our $VERSION = '0.1.0';
 
 my (%opt);
 
-# If running the 'exec' command, we insert a -- into the arg list after the
-# command, so the user never has to
+# If running the 'exec' command, hide the command from our option parsing
 my @exec_args;
 if ( scalar @ARGV > 2 && $ARGV[1] eq 'exec' ) {
     @exec_args = splice(@ARGV, 2);
@@ -51,7 +50,9 @@ if (!GetOptions(\%opt,
     # Other options will go here, as individual commands want them
 
     # Only used by 'create'
+    'a|autostart',
     'm|mirror=s',
+    'n|no-start',
     't|template=s',
     'u|user-from-host',
 
@@ -100,7 +101,7 @@ if ( defined $command ) {
     pod2usage(-exitval => 0, -verbose => 0) unless $name;
 }
 else {
-    # For commands that don't operate on containers (e.g. 'status')
+    # For commands that don't have to operate on containers (e.g. 'status')
     $command = $name;
     $name    = undef;
 }
@@ -111,8 +112,10 @@ given ( $command ) {
     when ( 'create' ) {
         $app->create(
             name           => $name,
+            autostart      => $opt{a},
             install_user   => $opt{u},
             mirror         => $opt{m},
+            start          => !$opt{n},
             template       => $opt{t},
         );
     }
@@ -168,6 +171,12 @@ given ( $command ) {
             all  => $opt{a},
         );
     }
+    when ( 'autostart' ) {
+        $app->autostart;
+    }
+    when ( 'stopall' ) {
+        $app->stopall;
+    }
     default {
         die "No such command.\n\nTry $0 --help\n";
     }
@@ -193,6 +202,7 @@ lxc - Wrapper around lxc utils to make managing containers easier
      lxc [name] enter
      lxc [name] exec command [args]
      lxc [name] console
+     lxc [name] status
      lxc status
      lxc resync
 
@@ -223,19 +233,39 @@ system.
 
 =back
 
-=head1 OPTIONS FOR C<create>
+=head1 COMMANDS
+
+=head2 lxc [name] create
+
+Creates a new container. Will also start it unless you pass C<-n>.
+
+You will probably want to use the template option to specify the distribution
+your container should be.
+
+Take note of C<-u> - it can be useful if you want to set up a container for
+developing software in.
+
+=head3 Options
 
 =over 4
 
-=item B<-t|--template>
+=item B<-a|--autostart>
 
-Specify an LXC template to use to create the container with. This is passed
-through to C<lxc-create>.
+Flag this container as one that should be automatically started on boot.
 
 =item B<-m|--mirror>
 
 Specify an apt mirror to use inside the container (regretfully, not used for
 downloading the container yet - upstream needs to offer this feature).
+
+=item B<-n|--no-start>
+
+Don't start the container once created (the default is to start it).
+
+=item B<-t|--template>
+
+Specify an LXC template to use to create the container with. This is passed
+through to C<lxc-create>.
 
 =item B<-u|--user-from-host>
 
@@ -244,7 +274,91 @@ into the container and create a user account for you.
 
 The user account will have the same password as your account on the host.
 
+This option is useful when you want to create a container for developing
+software in. You can use your IDE/editor setup/VCS that you have already
+configured on the host, and the bind mount means the container can see all your
+code.
+
 =back
+
+=head2 lxc [name] destroy
+
+Destroys a container. You'll be asked to confirm first. This operation cannot
+be undone!
+
+=head2 lxc [name] start
+
+Starts a container. It waits until networking is up in the container, which
+means C<enter> will work.
+
+=head2 lxc [name] stop
+
+Gracefully shuts down a container (unlike the rather brutal L<lxc-stop>
+command).
+
+=head2 lxc [name] restart
+
+Stops a container, if it's running, then starts it.
+
+=head2 lxc [name] enter
+
+Gives you a shell inside the container.
+
+Under the hood, this is currently implemented with ssh, until kernels with
+L<lxc-attach> support are widely available.
+
+=head2 lxc [name] exec command [args]
+
+Executes the command in the container.
+
+=head2 lxc [name] console
+
+Connects you to C<tty1> in the container.
+
+Note that you can only do this from one place at a time, however this command
+is just a layer over L<lxc-console>, so you could get more if you wanted.
+However, in most cases, you'll just want to use L<lxc [name] enter> instead.
+
+The one time this is useful is if networking is down inside the container.
+
+=head2 lxc [name] status
+
+Tells you the status of the container.
+
+Currently, this is limited to whether it's running or not. This is just a
+wrapper around L<lxc-info>.
+
+=head2 lxc status
+
+Tells you the status of all containers.
+
+=head2 lxc [name] resync [-a]
+
+Runs puppet in container(s). This actually has three variants:
+
+=over 4
+
+=item C<lxc [name] resync> - runs puppet in a container
+
+=item C<lxc resync> - runs puppet in all running containers
+
+=item C<lxc resync -a> - runs puppet in all containers, starting stopped ones
+to run puppet in them, and stopping them again when done
+
+=back
+
+=head2 lxc autostart
+
+Starts all containers that have a file called 'autostart' in their lxc config
+directory (usually /var/lib/lxc/[name]).
+
+This is most useful for starting containers automatically on boot.
+
+=head2 lxc stopall
+
+Stops all containers.
+
+This is most useful for stopping containers automatically on shutdown.
 
 =head1 AUTHOR
 

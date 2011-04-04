@@ -64,10 +64,27 @@ Put this in ``/etc/lxc/lxc.conf``:
     lxc test start
 
     # Enter it
-    lxc test enter    # might have to wait a few seconds for networking
+    lxc test enter
 
     # Stop the container
     lxc test stop
 
     # Destroy it (you'll be asked to confirm)
     lxc test destroy
+
+5. Starting containers automatically on boot
+--------------------------------------------
+
+On ubuntu, install the upstart jobs:
+
+    cp upstart/lxc-* /etc/init
+
+And when you create your containers, use -a to flag them as ones that should be
+automatically started on boot.
+
+If you have a container you already made that you want to start on boot:
+
+    touch /var/lib/lxc/[name]/autostart
+
+Good luck!
+ -- Nigel McNie & Martyn Smith

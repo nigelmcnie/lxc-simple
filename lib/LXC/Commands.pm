@@ -63,6 +63,10 @@ Takes a hash with the following keys:
 
 The name of the container to create.
 
+=item autostart
+
+Whether the container should be flagged to be automatically started on boot.
+
 =item install_user
 
 If true, bind mounts /home into the container. Also, if this script was invoked
@@ -72,6 +76,10 @@ using the same details as on the host (e.g. same password).
 =item mirror
 
 The mirror to use to download packages.
+
+=item start
+
+Whether to start the container once created.
 
 =item template
 
@@ -101,6 +109,9 @@ sub create {
     mkdir($container_root->subdir('etc/lxc-puppet'));
     append_file($container_cfgroot->file('fstab')->stringify,
         sprintf("$puppet_root    %s    auto bind 0 0\n", $container_root . '/etc/lxc-puppet'));
+
+    # Dump autostart file down if asked for
+    write_file($container_cfgroot->file('autostart')->stringify, '') if $args{autostart};
 
     # Install our own /etc/network/interfaces
     my $interfaces_content = q(
@@ -194,6 +205,8 @@ node "$name" {
         name    => $name,
         command => [ qw(puppet /etc/lxc-puppet/site.pp) ],
     );
+
+    $self->stop(name => $name) unless $args{start};
 }
 
 
@@ -222,7 +235,7 @@ sub destroy {
         $self->stop(name => $name);
     }
 
-    print "Destroying test... ";
+    print "Destroying $name... ";
     my $puppet_file = $self->puppet_dir->file("nodes/$name.pp");
     if ( -f $puppet_file ) {
         system('mv', $puppet_file, $puppet_file . '.old');
@@ -284,7 +297,11 @@ sub start {
 
 =head2 stop
 
-Stops a container.
+Gracefully stops a container.
+
+This runs 'halt' in the container and then waits until all processes have
+exited, or some time has passed. If processes are still around after that time,
+it murders them.
 
 Takes a hash with the following keys:
 
@@ -306,14 +323,45 @@ sub stop {
     die "Container '$name' IS stopped\n" if $self->status(name => $name, brief => 1) eq 'stopped';
 
     print "Stopping $name... ";
+
+    $self->enter(
+        name    => $name,
+        command => [ qw(halt) ],
+    );
     unlink $self->lxc_dir->file("$name/rootfs/lxc-ip");
-    system('lxc-stop',
-        '-n', $name,
-    );
-    system('lxc-wait',
-        '-n', $name,
-        '-s', 'STOPPED',
-    );
+
+    # Now we wait until all the processes go away
+    my $timeout = 20;
+    my $unresponsive = 1;
+    for (1..$timeout*10) {
+        my ($stdout, $stderr, $return_code) = tap(
+            'lxc-ps',
+            '--lxc',
+            'ax',
+        );
+        print STDERR $stderr;
+        exit $return_code if $return_code;
+
+        my $count = grep { $_ =~ /^\Q$name\E/ } split "\n", $stdout;
+        unless ( $count ) {
+            $unresponsive = 0;
+            last;
+        }
+
+        usleep 100_000;
+    }
+
+    if ( $unresponsive ) {
+        print "WARNING: Container '$name' still wasn't shut down after $timeout seconds, forcing it... ";
+        system('lxc-stop',
+            '-n', $name,
+        );
+        system('lxc-wait',
+            '-n', $name,
+            '-s', 'STOPPED',
+        );
+    }
+
     print "done\n";
 }
 
@@ -322,8 +370,8 @@ sub stop {
 
 Restarts a container.
 
-Note that this is a brutal stop/start. Stop is nasty by default, it doesn't
-even attempt to do a graceful halt (a problem to fix in future).
+This issues a stop, if the container is running, and then a start. After this,
+the container will be running even if it wasn't before.
 
 Takes a hash with the following keys:
 
@@ -435,7 +483,7 @@ sub enter {
 Gives you a console in the container.
 
 Note you can only grab ONE console. Really, 'enter' is the better command to be
-using (although it doesn't work in maverick or earlier).
+using, but if networking is down in the container, you'll have to use this.
 
 Takes a hash with the following keys:
 
@@ -501,6 +549,7 @@ sub status {
             if ( $status =~ m{^'\Q$name\E' is ([A-Z]+)$} ) {
                 return lc $1;
             }
+            print STDERR $stderr;
             die "Could not get status for container\n";
         }
 
@@ -524,6 +573,23 @@ sub status {
 
 
 =head2 resync
+
+Runs puppet in container(s).
+
+Takes a hash with the following keys:
+
+=over 4
+
+=item name
+
+The name of the container to get status information for (optional).
+
+=item all
+
+Boolean, whether to run puppet in B<all> containers, even stopped ones. This
+will start them to run puppet, and stop them once done.
+
+=back
 
 =cut
 
@@ -575,6 +641,51 @@ sub resync {
 }
 
 
+=head2 autostart
+
+Starts all containers that have a file called 'autostart' in their lxc config
+directory.
+
+=cut
+
+sub autostart {
+    my ($self, %args) = @_;
+
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
+        if ( -d $dir && $dir =~ m{/([^/]+)$} && -f "$dir/autostart" ) {
+            # Try to start, but don't bail out if it's not possible
+            eval {
+                $self->start(name => $1);
+            };
+            print STDERR $@ if $@;
+        }
+    }
+}
+
+
+=head2 stopall
+
+Stops all containers.
+
+=cut
+
+sub stopall {
+    my ($self, %args) = @_;
+
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
+        if ( -d $dir && $dir =~ m{/([^/]+)$} ) {
+            # Try to stop, but don't bail out if we couldn't stop one
+            eval {
+                $self->stop(name => $1) if $self->status(name => $1, brief => 1) eq 'running';
+            };
+            print STDERR $@ if $@;
+        }
+    }
+}
+
+
 =head2 check_valid_container
 
 Given a container name, checks if the name refers to an existing container.
@@ -585,6 +696,7 @@ sub check_valid_container {
     my ($self, $name) = @_;
     die "No such container '$name'\n" unless -d $self->lxc_dir->subdir($name);
 }
+
 
 =head1 AUTHOR
 
