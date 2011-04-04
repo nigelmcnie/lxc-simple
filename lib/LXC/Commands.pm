@@ -44,6 +44,12 @@ has lxc_dir => (
     required => 1,
 );
 
+has puppet_dir => (
+    is => 'rw',
+    isa => 'Path::Class::Dir',
+    required => 1,
+);
+
 
 =head2 create
 
@@ -89,6 +95,12 @@ sub create {
 
     my $container_cfgroot = $self->lxc_dir->subdir($name);
     my $container_root    = $self->lxc_dir->subdir($name . '/rootfs/');
+    my $puppet_root       = $self->puppet_dir;
+
+    # Puppet mount
+    mkdir($container_root->subdir('etc/lxc-puppet'));
+    append_file($container_cfgroot->file('fstab')->stringify,
+        sprintf("$puppet_root    %s    auto bind 0 0\n", $container_root . '/etc/lxc-puppet'));
 
     # Install our own /etc/network/interfaces
     my $interfaces_content = q(
@@ -137,6 +149,9 @@ iface eth0 inet dhcp
         }
     }
 
+    # Start the container so we can run initial commands inside it
+    $self->start(name => $name);
+
     if ( $args{mirror} ) {
         my $mirror = $args{mirror};
         my $apt_sources_file = $container_root->file('etc/apt/sources.list')->stringify;
@@ -145,11 +160,40 @@ iface eth0 inet dhcp
         $contents =~ s/archive.ubuntu.com/$mirror/g;
         write_file($apt_sources_file, $contents);
 
-        system('chroot', $container_root, 'apt-get', 'update');
+        $self->enter(
+            name    => $name,
+            command => [ qw(apt-get update) ],
+        );
     }
 
-    system('chroot', $container_root, 'apt-get', 'install', '-y', '--force-yes', 'gpgv');
-    system('chroot', $container_root, 'apt-get', 'update');
+    # Install gpgv so we can validate apt repos, then do an apt update
+    $self->enter(
+        name    => $name,
+        command => [ qw(apt-get install -y --force-yes gpgv) ],
+    );
+    $self->enter(
+        name    => $name,
+        command => [ qw(apt-get update) ],
+    );
+
+    # Install puppet in the container
+    # NOTE: installing policycoreutils to somewhat shut puppet up on lucid
+    $self->enter(
+        name    => $name,
+        command => [ qw(apt-get -y --no-install-recommends install puppet policycoreutils) ],
+    );
+
+    # Write a node definition for this container
+    write_file($puppet_root->file("nodes/$name.pp")->stringify, qq(# Puppet node definition for $name
+node "$name" {
+    include ubuntu-lucid
+}
+));
+    # Run puppet in the container for the first time
+    $self->enter(
+        name    => $name,
+        command => [ qw(puppet /etc/lxc-puppet/site.pp) ],
+    );
 }
 
 
@@ -179,6 +223,10 @@ sub destroy {
     }
 
     print "Destroying test... ";
+    my $puppet_file = $self->puppet_dir->file("nodes/$name.pp");
+    if ( -f $puppet_file ) {
+        system('mv', $puppet_file, $puppet_file . '.old');
+    }
     system('lxc-destroy',
         '-n', $name,
     );
@@ -470,6 +518,58 @@ sub status {
             system('lxc-info',
                 '-n', $1,
             );
+        }
+    }
+}
+
+
+=head2 resync
+
+=cut
+
+sub resync {
+    my ($self, %args) = @_;
+
+    if ( $args{name} ) {
+        my $name = $args{name};
+        $self->check_valid_container($name);
+
+        $self->enter(
+            name    => $name,
+            command => [ qw(puppet /etc/lxc-puppet/site.pp) ],
+        );
+        return;
+    }
+
+    # Resync all - basic "one at a time" method, would be nicer to do them in
+    # parallel
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
+        if ( -d $dir && $dir =~ m{/([^/]+)$} ) {
+            my $name = $1;
+            my $was_stopped = 0;
+
+            if ( $self->status(name => $name, brief => 1) eq 'stopped' ) {
+                if ( $args{all} ) {
+                    $self->start(name => $name);
+                    $was_stopped = 1;
+                }
+                else {
+                    next;
+                }
+            }
+
+            eval {
+                $self->enter(
+                    name    => $name,
+                    command => [ qw(puppet /etc/lxc-puppet/site.pp) ],
+                );
+            };
+            print STDERR $@ if $@;
+
+            if ( $was_stopped ) {
+                $self->stop(name => $name);
+            }
         }
     }
 }

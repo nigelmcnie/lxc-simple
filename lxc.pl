@@ -54,6 +54,9 @@ if (!GetOptions(\%opt,
     'm|mirror=s',
     't|template=s',
     'u|user-from-host',
+
+    # Only used by 'resync'
+    'a|all',
 )) {
     pod2usage(-exitval => 1, -verbose => 0);
 }
@@ -85,6 +88,7 @@ foreach my $filename ( @searchpath ) {
 
 my $app = LXC::Commands->new(
     lxc_dir    => Path::Class::dir($cfg ? $cfg->val('paths', 'lxc_dir') : '/var/lib/lxc'),
+    puppet_dir => Path::Class::dir($cfg ? $cfg->val('paths', 'puppet_dir') : "$FindBin::Bin/puppet"),
 );
 
 
@@ -158,6 +162,12 @@ given ( $command ) {
             name => $name,
         );
     }
+    when ( 'resync' ) {
+        $app->resync(
+            name => $name,
+            all  => $opt{a},
+        );
+    }
     default {
         die "No such command.\n\nTry $0 --help\n";
     }
@@ -184,12 +194,19 @@ lxc - Wrapper around lxc utils to make managing containers easier
      lxc [name] exec command [args]
      lxc [name] console
      lxc status
+     lxc resync
 
 =head1 DESCRIPTION
 
 C<lxc> wraps around the low-level commands for controlling linux containers, to
 make it easier to manage containers for the common case - which is creating
 containers that work in a similar fashion to vservers or jails.
+
+People often create many containers. When you do, what happens when you decided
+that your containers should all have some package installed in them? It's a
+pain to make such changes manually to each existing container. C<lxc> fixes
+this by installing puppet in each container, and giving you a command
+(C<lxc resync>) that will sync all containers with a puppet manifest you define.
 
 =head1 OPTIONS
 
