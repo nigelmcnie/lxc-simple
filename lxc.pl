@@ -37,8 +37,7 @@ our $VERSION = '0.1.0';
 
 my (%opt);
 
-# If running the 'exec' command, we insert a -- into the arg list after the
-# command, so the user never has to
+# If running the 'exec' command, hide the command from our option parsing
 my @exec_args;
 if ( scalar @ARGV > 2 && $ARGV[1] eq 'exec' ) {
     @exec_args = splice(@ARGV, 2);
@@ -97,7 +96,7 @@ if ( defined $command ) {
     pod2usage(-exitval => 0, -verbose => 0) unless $name;
 }
 else {
-    # For commands that don't operate on containers (e.g. 'status')
+    # For commands that don't have to operate on containers (e.g. 'status')
     $command = $name;
     $name    = undef;
 }
@@ -185,6 +184,7 @@ lxc - Wrapper around lxc utils to make managing containers easier
      lxc [name] enter
      lxc [name] exec command [args]
      lxc [name] console
+     lxc [name] status
      lxc status
 
 =head1 DESCRIPTION

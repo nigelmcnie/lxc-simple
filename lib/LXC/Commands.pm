@@ -393,7 +393,7 @@ sub enter {
 Gives you a console in the container.
 
 Note you can only grab ONE console. Really, 'enter' is the better command to be
-using (although it doesn't work in maverick or earlier).
+using, but if networking is down in the container, you'll have to use this.
 
 Takes a hash with the following keys:
 
