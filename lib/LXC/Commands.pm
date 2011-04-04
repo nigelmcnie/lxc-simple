@@ -57,6 +57,10 @@ Takes a hash with the following keys:
 
 The name of the container to create.
 
+=item autostart
+
+Whether the container should be flagged to be automatically started on boot.
+
 =item install_user
 
 If true, bind mounts /home into the container. Also, if this script was invoked
@@ -93,6 +97,9 @@ sub create {
 
     my $container_cfgroot = $self->lxc_dir->subdir($name);
     my $container_root    = $self->lxc_dir->subdir($name . '/rootfs/');
+
+    # Dump autostart file down if asked for
+    write_file($container_cfgroot->file('autostart')->stringify, '') if $args{autostart};
 
     # Install our own /etc/network/interfaces
     my $interfaces_content = q(
@@ -512,6 +519,51 @@ sub status {
             system('lxc-info',
                 '-n', $1,
             );
+        }
+    }
+}
+
+
+=head2 autostart
+
+Starts all containers that have a file called 'autostart' in their lxc config
+directory.
+
+=cut
+
+sub autostart {
+    my ($self, %args) = @_;
+
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
+        if ( -d $dir && $dir =~ m{/([^/]+)$} && -f "$dir/autostart" ) {
+            # Try to start, but don't bail out if it's not possible
+            eval {
+                $self->start(name => $1);
+            };
+            print STDERR $@ if $@;
+        }
+    }
+}
+
+
+=head2 stopall
+
+Stops all containers.
+
+=cut
+
+sub stopall {
+    my ($self, %args) = @_;
+
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
+        if ( -d $dir && $dir =~ m{/([^/]+)$} ) {
+            # Try to stop, but don't bail out if we couldn't stop one
+            eval {
+                $self->stop(name => $1) if $self->status(name => $1, brief => 1) eq 'running';
+            };
+            print STDERR $@ if $@;
         }
     }
 }

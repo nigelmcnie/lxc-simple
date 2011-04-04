@@ -50,6 +50,7 @@ if (!GetOptions(\%opt,
     # Other options will go here, as individual commands want them
 
     # Only used by 'create'
+    'a|autostart',
     'm|mirror=s',
     'n|no-start',
     't|template=s',
@@ -107,6 +108,7 @@ given ( $command ) {
     when ( 'create' ) {
         $app->create(
             name           => $name,
+            autostart      => $opt{a},
             install_user   => $opt{u},
             mirror         => $opt{m},
             start          => !$opt{n},
@@ -158,6 +160,12 @@ given ( $command ) {
         $app->status(
             name => $name,
         );
+    }
+    when ( 'autostart' ) {
+        $app->autostart;
+    }
+    when ( 'stopall' ) {
+        $app->stopall;
     }
     default {
         die "No such command.\n\nTry $0 --help\n";
@@ -223,6 +231,10 @@ developing software in.
 =head3 Options
 
 =over 4
+
+=item B<-a|--autostart>
+
+Flag this container as one that should be automatically started on boot.
 
 =item B<-m|--mirror>
 
@@ -302,6 +314,19 @@ wrapper around L<lxc-info>.
 =head2 lxc status
 
 Tells you the status of all containers.
+
+=head2 lxc autostart
+
+Starts all containers that have a file called 'autostart' in their lxc config
+directory (usually /var/lib/lxc/[name]).
+
+This is most useful for starting containers automatically on boot.
+
+=head2 lxc stopall
+
+Stops all containers.
+
+This is most useful for stopping containers automatically on shutdown.
 
 =head1 AUTHOR
 
