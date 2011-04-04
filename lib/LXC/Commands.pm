@@ -178,7 +178,7 @@ sub destroy {
         $self->stop(name => $name);
     }
 
-    print "Destroying test... ";
+    print "Destroying $name... ";
     system('lxc-destroy',
         '-n', $name,
     );
