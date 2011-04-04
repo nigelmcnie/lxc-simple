@@ -527,6 +527,7 @@ sub check_valid_container {
     die "No such container '$name'\n" unless -d $self->lxc_dir->subdir($name);
 }
 
+
 =head1 AUTHOR
 
 Shoptime Software

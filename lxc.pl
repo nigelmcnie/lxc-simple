@@ -208,7 +208,19 @@ system.
 
 =back
 
-=head1 OPTIONS FOR C<create>
+=head1 COMMANDS
+
+=head2 lxc [name] create
+
+Creates a new container. Will also start it unless you pass C<-n>.
+
+You will probably want to use the template option to specify the distribution
+your container should be.
+
+Take note of C<-u> - it can be useful if you want to set up a container for
+developing software in.
+
+=head3 Options
 
 =over 4
 
@@ -233,7 +245,63 @@ into the container and create a user account for you.
 
 The user account will have the same password as your account on the host.
 
+This option is useful when you want to create a container for developing
+software in. You can use your IDE/editor setup/VCS that you have already
+configured on the host, and the bind mount means the container can see all your
+code.
+
 =back
+
+=head2 lxc [name] destroy
+
+Destroys a container. You'll be asked to confirm first. This operation cannot
+be undone!
+
+=head2 lxc [name] start
+
+Starts a container. It waits until networking is up in the container, which
+means C<enter> will work.
+
+=head2 lxc [name] stop
+
+Gracefully shuts down a container (unlike the rather brutal L<lxc-stop>
+command).
+
+=head2 lxc [name] restart
+
+Stops a container, if it's running, then starts it.
+
+=head2 lxc [name] enter
+
+Gives you a shell inside the container.
+
+Under the hood, this is currently implemented with ssh, until kernels with
+L<lxc-attach> support are widely available.
+
+=head2 lxc [name] exec command [args]
+
+Executes the command in the container.
+
+=head2 lxc [name] console
+
+Connects you to C<tty1> in the container.
+
+Note that you can only do this from one place at a time, however this command
+is just a layer over L<lxc-console>, so you could get more if you wanted.
+However, in most cases, you'll just want to use L<lxc [name] enter> instead.
+
+The one time this is useful is if networking is down inside the container.
+
+=head2 lxc [name] status
+
+Tells you the status of the container.
+
+Currently, this is limited to whether it's running or not. This is just a
+wrapper around L<lxc-info>.
+
+=head2 lxc status
+
+Tells you the status of all containers.
 
 =head1 AUTHOR
 
