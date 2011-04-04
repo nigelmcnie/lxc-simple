@@ -296,17 +296,17 @@ sub stop {
         usleep 100_000;
     }
 
-    if ( $self->status(name => $name, brief => 1) eq 'running' ) {
-        print "WARNING: Container '$name' still wasn't shut down after $timeout seconds, forcing it... " if $unresponsive;
+    if ( $unresponsive ) {
+        print "WARNING: Container '$name' still wasn't shut down after $timeout seconds, forcing it... ";
         system('lxc-stop',
             '-n', $name,
         );
+        system('lxc-wait',
+            '-n', $name,
+            '-s', 'STOPPED',
+        );
     }
 
-    system('lxc-wait',
-        '-n', $name,
-        '-s', 'STOPPED',
-    );
     print "done\n";
 }
 
@@ -494,6 +494,7 @@ sub status {
             if ( $status =~ m{^'\Q$name\E' is ([A-Z]+)$} ) {
                 return lc $1;
             }
+            print STDERR $stderr;
             die "Could not get status for container\n";
         }
 
