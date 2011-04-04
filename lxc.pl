@@ -52,6 +52,7 @@ if (!GetOptions(\%opt,
 
     # Only used by 'create'
     'm|mirror=s',
+    'n|no-start',
     't|template=s',
     'u|user-from-host',
 )) {
@@ -109,6 +110,7 @@ given ( $command ) {
             name           => $name,
             install_user   => $opt{u},
             mirror         => $opt{m},
+            start          => !$opt{n},
             template       => $opt{t},
         );
     }
@@ -210,15 +212,19 @@ system.
 
 =over 4
 
-=item B<-t|--template>
-
-Specify an LXC template to use to create the container with. This is passed
-through to C<lxc-create>.
-
 =item B<-m|--mirror>
 
 Specify an apt mirror to use inside the container (regretfully, not used for
 downloading the container yet - upstream needs to offer this feature).
+
+=item B<-n|--no-start>
+
+Don't start the container once created (the default is to start it).
+
+=item B<-t|--template>
+
+Specify an LXC template to use to create the container with. This is passed
+through to C<lxc-create>.
 
 =item B<-u|--user-from-host>
 

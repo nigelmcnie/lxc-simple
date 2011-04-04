@@ -67,6 +67,10 @@ using the same details as on the host (e.g. same password).
 
 The mirror to use to download packages.
 
+=item start
+
+Whether to start the container once created.
+
 =item template
 
 The template to use to create the container (see C<lxc-create>'s C<--template>
@@ -150,6 +154,8 @@ iface eth0 inet dhcp
 
     system('chroot', $container_root, 'apt-get', 'install', '-y', '--force-yes', 'gpgv');
     system('chroot', $container_root, 'apt-get', 'update');
+
+    $self->start(name => $name) if $args{start};
 }
 
 
