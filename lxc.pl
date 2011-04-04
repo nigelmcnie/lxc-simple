@@ -22,10 +22,12 @@ use strict;
 use 5.010;
 
 use Carp;
+use Config::IniFiles;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 use Getopt::Long qw(GetOptions);
 use LXC::Commands;
+use Path::Class;
 use Pod::Usage;
 use Sysadm::Install qw(ask);
 
@@ -68,6 +70,24 @@ if ( $opt{version} ) {
 }
 
 
+# Configure app
+my $cfg;
+my @searchpath = (
+    '/etc/lxc/lxc-simple.ini',
+    "$FindBin::Bin/lxc-simple.ini",
+);
+foreach my $filename ( @searchpath ) {
+    if ( -f $filename ) {
+        $cfg = Config::IniFiles->new(-file => $filename);
+        last;
+    }
+}
+
+my $app = LXC::Commands->new(
+    lxc_dir    => Path::Class::dir($cfg ? $cfg->val('paths', 'lxc_dir') : '/var/lib/lxc'),
+);
+
+
 # Run command!
 my $name    = shift;
 my $command = shift;
@@ -85,7 +105,7 @@ unless ($> == 0 || $< == 0) { die "You must be root\n" }
 
 given ( $command ) {
     when ( 'create' ) {
-        LXC::Commands->create(
+        $app->create(
             name           => $name,
             install_user   => $opt{u},
             mirror         => $opt{m},
@@ -93,48 +113,48 @@ given ( $command ) {
         );
     }
     when ( 'destroy' ) {
-        LXC::Commands->check_valid_container($name);
+        $app->check_valid_container($name);
 
         my $input = ask("Are you sure you want to destroy '$name'?", 'n');
         die "Aborted\n" unless $input =~ m{^y}i;
 
-        LXC::Commands->destroy(
+        $app->destroy(
             name => $name,
         );
     }
     when ( 'start' ) {
-        LXC::Commands->start(
+        $app->start(
             name => $name,
         );
     }
     when ( 'stop' ) {
-        LXC::Commands->stop(
+        $app->stop(
             name => $name,
         );
     }
     when ( 'restart' ) {
-        LXC::Commands->restart(
+        $app->restart(
             name => $name,
         );
     }
     when ( 'enter' ) {
-        LXC::Commands->enter(
+        $app->enter(
             name => $name,
         );
     }
     when ( 'console' ) {
-        LXC::Commands->console(
+        $app->console(
             name => $name,
         );
     }
     when ( 'exec' ) {
-        LXC::Commands->enter(
+        $app->enter(
             name    => $name,
             command => \@ARGV,
         );
     }
     when ( 'status' ) {
-        LXC::Commands->status(
+        $app->status(
             name => $name,
         );
     }

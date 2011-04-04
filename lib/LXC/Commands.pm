@@ -16,8 +16,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 package LXC::Commands;
-use warnings;
-use strict;
+use Moose;
 
 use File::Slurp;
 use Passwd::Unix;
@@ -37,6 +36,13 @@ if you wish.
 =head1 METHODS
 
 =cut
+
+
+has lxc_dir => (
+    is => 'rw',
+    isa => 'Path::Class::Dir',
+    required => 1,
+);
 
 
 =head2 create
@@ -71,7 +77,7 @@ option).
 =cut
 
 sub create {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify a name for the container to be created\n";
 
     system('lxc-create',
@@ -81,10 +87,8 @@ sub create {
     ) == 0
         or die "lxc-create failed with exit code $?\n";
 
-    # TODO /var/lib/lxc should be configurable
-    my $lxc_root          = '/var/lib/lxc/';
-    my $container_cfgroot = $lxc_root . $name . '/';
-    my $container_root    = $lxc_root . $name . '/rootfs/';
+    my $container_cfgroot = $self->lxc_dir->subdir($name);
+    my $container_root    = $self->lxc_dir->subdir($name . '/rootfs/');
 
     # Install our own /etc/network/interfaces
     my $interfaces_content = q(
@@ -98,12 +102,12 @@ iface eth0 inet dhcp
     up ip a s dev eth0 | grep 'inet\W' | awk '{print $2}' | cut -f 1 -d '/' > /lxc-ip
     down rm /lxc-ip
 );
-    write_file($container_root . 'etc/network/interfaces', $interfaces_content);
+    write_file($container_root->file('etc/network/interfaces')->stringify, $interfaces_content);
 
     # Bindmount homedir and install user account if asked for
     if ( $args{install_user} ) {
-        append_file($container_cfgroot . 'fstab',
-            sprintf("/home           %s         auto bind 0 0\n", $container_root . 'home'));
+        append_file($container_cfgroot->file('fstab')->stringify,
+            sprintf("/home           %s         auto bind 0 0\n", $container_root . '/home'));
 
         # TODO naturally, we could grab this information from a config file
         if ( exists $ENV{SUDO_USER} ) {
@@ -120,9 +124,9 @@ iface eth0 inet dhcp
             my @groupinfo = $hostpw->group($group);
 
             my $containerpw = Passwd::Unix->new(
-                passwd => $container_root . 'etc/passwd',
-                shadow => $container_root . 'etc/shadow',
-                group  => $container_root . 'etc/group',
+                passwd => $container_root->file('etc/passwd'),
+                shadow => $container_root->file('etc/shadow'),
+                group  => $container_root->file('etc/group'),
                 backup => 0,
             );
             $containerpw->user($user, @userinfo);
@@ -135,7 +139,7 @@ iface eth0 inet dhcp
 
     if ( $args{mirror} ) {
         my $mirror = $args{mirror};
-        my $apt_sources_file = $container_root . 'etc/apt/sources.list';
+        my $apt_sources_file = $container_root->file('etc/apt/sources.list')->stringify;
 
         my $contents = read_file($apt_sources_file);
         $contents =~ s/archive.ubuntu.com/$mirror/g;
@@ -166,12 +170,12 @@ The name of the container to destroy.
 =cut
 
 sub destroy {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to destroy\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
 
-    if ( $class->status(name => $name, brief => 1) eq 'running' ) {
-        $class->stop(name => $name);
+    if ( $self->status(name => $name, brief => 1) eq 'running' ) {
+        $self->stop(name => $name);
     }
 
     print "Destroying test... ";
@@ -199,11 +203,11 @@ The name of the container to start.
 =cut
 
 sub start {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to start\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
 
-    die "Container '$name' IS started\n" if $class->status(name => $name, brief => 1) eq 'running';
+    die "Container '$name' IS started\n" if $self->status(name => $name, brief => 1) eq 'running';
 
     print "Starting $name... ";
     system('lxc-start',
@@ -218,8 +222,11 @@ sub start {
     # NOTE: this will go away once Martyn works out a smarter way of handling
     # container networking
     for (1..100) {
-        last if -f "/var/lib/lxc/$name/rootfs/lxc-ip";
-        die "Could not start container!" if $_ == 100;
+        last if -f $self->lxc_dir->file("$name/rootfs/lxc-ip");
+        if ( $_ == 100 ) {
+            print "Could not confirm container started, check with 'lxc $name enter'\n";
+            return;
+        }
         usleep 100_000;
     }
 
@@ -244,14 +251,14 @@ The name of the container to stop.
 =cut
 
 sub stop {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to stop\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
 
-    die "Container '$name' IS stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
+    die "Container '$name' IS stopped\n" if $self->status(name => $name, brief => 1) eq 'stopped';
 
     print "Stopping $name... ";
-    unlink "/var/lib/lxc/$name/rootfs/lxc-ip";
+    unlink $self->lxc_dir->file("$name/rootfs/lxc-ip");
     system('lxc-stop',
         '-n', $name,
     );
@@ -283,18 +290,18 @@ The name of the container to restart.
 =cut
 
 sub restart {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to restart\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
 
-    if ( $class->status(name => $name, brief => 1) eq 'stopped' ) {
+    if ( $self->status(name => $name, brief => 1) eq 'stopped' ) {
         print "Container '$name' already stopped\n";
     }
     else {
-        $class->stop(name => $name);
+        $self->stop(name => $name);
     }
 
-    $class->start(name => $name);
+    $self->start(name => $name);
 }
 
 
@@ -329,28 +336,29 @@ An arrayref containing a command and arguments to run in the container
 =cut
 
 sub enter {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to get a shell in\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
     $args{command} //= [];
 
-    die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
+    die "Container '$name' is stopped\n" if $self->status(name => $name, brief => 1) eq 'stopped';
 
-    my $ip_file = "/var/lib/lxc/$name/rootfs/lxc-ip";
+    my $ip_file = $self->lxc_dir->file("$name/rootfs/lxc-ip")->stringify;
     die "Could not determine IP to ssh to (maybe networking isn't up in '$name' yet)\n" unless -f $ip_file;
     my $ip = read_file($ip_file);
     chomp $ip;
     die "No IP available for container '$name'" unless $ip;
     die "Could not determine IP to ssh to" unless $ip =~ m{^\d+\.\d+\.\d+\.\d+$};
 
-    my $host_key = read_file("/var/lib/lxc/$name/rootfs/etc/ssh/ssh_host_rsa_key.pub");
+    my $host_key = read_file($self->lxc_dir->file("$name/rootfs/etc/ssh/ssh_host_rsa_key.pub")->stringify);
     $host_key = (split /\s+/, $host_key)[1];
 
     # Generate an ssh keypair unless one already exists
-    unless ( -f "/var/lib/lxc/$name/ssh.key" ) {
+    my $ssh_key_file = $self->lxc_dir->file("$name/ssh.key");
+    unless ( -f $ssh_key_file ) {
         my ($stdout, $stderr, $return_code) = tap(
             'ssh-keygen',
-            '-f' => "/var/lib/lxc/$name/ssh.key",
+            '-f' => $ssh_key_file,
             '-P' => '',
         );
         print STDERR $stderr;
@@ -358,16 +366,16 @@ sub enter {
     }
 
     # Write out a known hosts file based on the ssh host key of the guest
-    write_file("/var/lib/lxc/$name/ssh.known_hosts", "$ip ssh-rsa $host_key\n");
+    write_file($self->lxc_dir->file("$name/ssh.known_hosts")->stringify, "$ip ssh-rsa $host_key\n");
 
     # Ensure root has the appropriate authorized_keys file in place
-    system('mkdir', '-p', "/var/lib/lxc/$name/rootfs/root/.ssh");
-    system('cp', "/var/lib/lxc/$name/ssh.key.pub", "/var/lib/lxc/$name/rootfs/root/.ssh/authorized_keys");
+    system('mkdir', '-p', $self->lxc_dir->file("$name/rootfs/root/.ssh"));
+    system('cp', $self->lxc_dir->file("$name/ssh.key.pub"), $self->lxc_dir->file("$name/rootfs/root/.ssh/authorized_keys"));
 
     system('ssh',
         '-l' => 'root',
-        '-i' => "/var/lib/lxc/$name/ssh.key",
-        '-o' => "UserKnownHostsFile=/var/lib/lxc/$name/ssh.known_hosts",
+        '-i' => $self->lxc_dir->file("$name/ssh.key"),
+        '-o' => 'UserKnownHostsFile=' . $self->lxc_dir->file("$name/ssh.known_hosts"),
         $ip,
         @{$args{command}}
     );
@@ -394,13 +402,13 @@ The name of the container to get a console in.
 =cut
 
 sub console {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
     my $name = $args{name} || die "Must specify what container to get a console in\n";
-    $class->check_valid_container($name);
+    $self->check_valid_container($name);
 
-    die "Container '$name' is stopped\n" if $class->status(name => $name, brief => 1) eq 'stopped';
+    die "Container '$name' is stopped\n" if $self->status(name => $name, brief => 1) eq 'stopped';
 
-    my $lockfile = '/var/lib/lxc/' . $name . '/console-lock';
+    my $lockfile = $self->lxc_dir->file("$name/console-lock")->stringify;
 
     die "You already have the console for this container open elsewhere\n" if -f $lockfile;
     write_file($lockfile, "locked by pid $$\n");
@@ -434,11 +442,11 @@ Boolean, whether to output brief (machine readable) information (optional).
 =cut
 
 sub status {
-    my ($class, %args) = @_;
+    my ($self, %args) = @_;
 
     if ( $args{name} ) {
         my $name = $args{name};
-        $class->check_valid_container($name);
+        $self->check_valid_container($name);
 
         if ( $args{brief} ) {
             my ($status, $stderr, $return_code) = tap('lxc-info', '-n', $name);
@@ -456,7 +464,8 @@ sub status {
     }
 
     # Status for all containers
-    for my $dir (</var/lib/lxc/*>) {
+    my $lxc_dir = $self->lxc_dir;
+    for my $dir (<$lxc_dir/*>) {
         if ( -d $dir && $dir =~ m{/([^/]+)$} ) {
             system('lxc-info',
                 '-n', $1,
@@ -473,8 +482,8 @@ Given a container name, checks if the name refers to an existing container.
 =cut
 
 sub check_valid_container {
-    my ($class, $name) = @_;
-    die "No such container '$name'\n" unless -d '/var/lib/lxc/' . $name;
+    my ($self, $name) = @_;
+    die "No such container '$name'\n" unless -d $self->lxc_dir->subdir($name);
 }
 
 =head1 AUTHOR

@@ -1,3 +1,2 @@
 Graceful cleanup if program is ctrl-C'd while in lxc-create
 lxc [name] enter using lxc-attach (relies on lxc-attach being implemented upstream)
-Make sure /var/lib/lxc isn't hard coded
