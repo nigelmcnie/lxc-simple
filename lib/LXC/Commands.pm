@@ -117,13 +117,14 @@ iface eth0 inet dhcp
 
     # Bindmount homedir and install user account if asked for
     if ( $args{install_user} ) {
-        append_file($container_cfgroot->file('fstab')->stringify,
-            sprintf("/home           %s         auto bind 0 0\n", $container_root . '/home'));
-
         # TODO naturally, we could grab this information from a config file
         if ( exists $ENV{SUDO_USER} ) {
             my $user  = $ENV{SUDO_USER};
             my $group = $ENV{SUDO_USER};
+
+            mkdir "$container_root/home/$user";
+            append_file($container_cfgroot->file('fstab')->stringify,
+                sprintf("/home/$user           %s         auto bind 0 0\n", "$container_root/home/$user"));
 
             my $hostpw = Passwd::Unix->new(
                 passwd => '/etc/passwd',
